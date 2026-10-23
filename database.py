@@ -3,6 +3,13 @@ from sqlalchemy.engine import URL
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.orm import sessionmaker
 
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    pass
+
+
 class Configuracoes(BaseSettings):
     DB_USER: str
     DB_PASSWORD: str
