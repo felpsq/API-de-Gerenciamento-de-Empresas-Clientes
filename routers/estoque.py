@@ -12,6 +12,10 @@ from schemas.movimentacao import (
     TipoMovimentacao,
 )
 
+from datetime import datetime
+from fastapi import Query
+from sqlalchemy.orm import aliased
+
 router = APIRouter(tags=["Estoque"])
 
 
@@ -75,11 +79,44 @@ def registrar_movimentacao(
     "/movimentacoes",
     response_model=list[MovimentacaoResponse],
 )
-def listar_movimentacoes(db: Session = Depends(get_db)):
-    return db.scalars(
-        select(Movimentacao)
-        .order_by(Movimentacao.id.desc())
-    ).all()
+def listar_movimentacoes(
+    data_inicio: datetime | None = None,
+    data_fim: datetime | None = None,
+    fornecedor_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    consulta = select(Movimentacao)
+
+    if data_inicio and data_fim and data_inicio > data_fim:
+        raise HTTPException(
+            status_code=422,
+            detail="Data inicial não pode ser maior que a final"
+        )
+
+    if data_inicio:
+        consulta = consulta.where(
+            Movimentacao.data_movimentacao >= data_inicio
+        )
+
+    if data_fim:
+        consulta = consulta.where(
+            Movimentacao.data_movimentacao <= data_fim
+        )
+
+    if fornecedor_id is not None:
+        consulta = consulta.join(
+            Produto,
+            Movimentacao.produto_id == Produto.id
+        ).where(
+            Produto.fornecedor_id == fornecedor_id
+        )
+
+    consulta = consulta.order_by(
+        Movimentacao.data_movimentacao.desc(),
+        Movimentacao.id.desc()
+    )
+
+    return db.scalars(consulta).all()
 
 
 @router.get(
@@ -103,3 +140,26 @@ def consultar_estoque(
         "nome": produto.nome,
         "quantidade_estoque": produto.quantidade_estoque,
     }
+
+@router.get(
+    "/estoque/baixo",
+    response_model=list[EstoqueResponse],
+)
+def listar_estoque_baixo(
+    limite: int = Query(default=10, ge=0),
+    db: Session = Depends(get_db),
+):
+    produtos = db.scalars(
+        select(Produto)
+        .where(Produto.quantidade_estoque <= limite)
+        .order_by(Produto.quantidade_estoque, Produto.id)
+    ).all()
+
+    return [
+        {
+            "produto_id": produto.id,
+            "nome": produto.nome,
+            "quantidade_estoque": produto.quantidade_estoque,
+        }
+        for produto in produtos
+    ]
