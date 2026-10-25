@@ -92,3 +92,14 @@ def test_fluxo_estoque(client):
     ]
 
     assert len(historico) == 2
+
+def test_erro_padronizado(client):
+    resposta = client.get("/categorias/999999")
+
+    assert resposta.status_code == 404
+    assert resposta.json() == {
+        "erro": {
+            "codigo": 404,
+            "mensagem": "Categoria não encontrada",
+        }
+    }
