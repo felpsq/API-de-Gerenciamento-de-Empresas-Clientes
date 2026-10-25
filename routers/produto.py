@@ -12,6 +12,7 @@ from schemas.produto import (
     ProdutoUpdate,
     ProdutoResponse,
 )
+from models.movimentacao import Movimentacao
 
 router = APIRouter(prefix="/produtos", tags=["Produtos"])
 
@@ -141,6 +142,14 @@ def excluir_produto(produto_id: int, db: Session = Depends(get_db)):
             409,
             "Não é possível excluir produto com estoque"
         )
-
+    if db.scalar(
+    select(Movimentacao.id)
+    .where(Movimentacao.produto_id == produto_id)
+    .limit(1)
+    ) is not None:
+        raise HTTPException(
+            409,
+            "Produto com histórico de movimentações não pode ser excluído",
+        )
     db.delete(produto)
     db.commit()
