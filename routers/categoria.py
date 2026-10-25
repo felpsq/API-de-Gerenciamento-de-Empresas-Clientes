@@ -10,6 +10,7 @@ from schemas.categoria import (
     CategoriaUpdate,
     CategoriaResponse,
 )
+from models.produto import produto_categoria
 
 router = APIRouter(prefix="/categorias", tags=["Categorias"])
 
@@ -102,5 +103,32 @@ def excluir_categoria(
             detail="Categoria não encontrada"
         )
 
+    # Impede a exclusão de categorias utilizadas por produtos.
+    # Isso preserva a classificação dos produtos cadastrados.
+    produto_vinculado = db.execute(
+        select(produto_categoria.c.produto_id)
+        .where(
+            produto_categoria.c.categoria_id == categoria_id
+        )
+        .limit(1)
+    ).first()
+
+    if produto_vinculado is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Não é possível excluir uma categoria "
+                "vinculada a produtos"
+            )
+        )
+
     db.delete(categoria)
-    db.commit()
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir esta categoria"
+        )
